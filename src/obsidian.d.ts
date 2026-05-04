@@ -8,6 +8,10 @@ declare module "obsidian" {
 		onClose(): Promise<void>;
 	}
 
+	export interface WorkspaceItem {
+		containerEl: HTMLElement;
+	}
+
 	export type AFItem = FolderItem | FileItem;
 
 	export interface FileItem {

@@ -33,9 +33,11 @@ export default class GitFileExplorerPlugin extends Plugin {
 		this.widgetManager = new WidgetManager(
 			new GitWidgetFactory(this.app, this.settings),
 			this.fileExplorerHandler,
-			this.getVaultBasePath()
+			this.getVaultBasePath(),
+			this.app
 		);
 
+		await this.widgetManager.initialize();
 		await this.widgetManager.update();
 
 		this.registerEventListeners(this.widgetManager.update);

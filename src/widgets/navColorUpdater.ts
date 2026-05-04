@@ -21,11 +21,13 @@ export class NavColorUpdater {
     }
 
     update(gitNodes: GitNode[]) {
-        if (!this.repoRelPath) return;
+        if (this.repoRelPath === undefined) return;
 
         const changedPaths = gitNodes.map((node) => {
             const rel = node.path.replace(/\\/g, "/");
-            return path.posix.normalize(`${this.repoRelPath}/${rel}`);
+            return this.repoRelPath
+                ? path.posix.normalize(`${this.repoRelPath}/${rel}`)
+                : rel;
         });
         
         const cssRules: string[] = [];
