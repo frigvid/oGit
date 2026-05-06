@@ -1,5 +1,6 @@
 import { TFile, TFolder } from "obsidian";
 import { GitRepository } from "./git/gitRepository";
+import { parseRemoteUrl, resolveWebHostname } from "./git/utils/remoteUrl";
 import { join } from "path";
 import { CapabilityProvider } from "./capabilityProvider";
 
@@ -36,12 +37,9 @@ export class ViewRemoteHandler implements CapabilityProvider {
 				return;
 			}
 
-			// Convert git URL to web URL if needed
-			const webUrl = this.convertToWebUrl(remoteUrl);
-			
-			console.log(`Opening remote repository: ${webUrl}`);
-			
-			// Open the URL in the default browser
+			const webUrl = await this.resolveToWebUrl(remoteUrl);
+			if (!webUrl) return;
+
 			window.open(webUrl, '_blank');
 			
 		} catch (error) {
@@ -91,7 +89,7 @@ export class ViewRemoteHandler implements CapabilityProvider {
 			const { exec } = require('child_process');
 			const { promisify } = require('util');
 			const execAsync = promisify(exec);
-			
+
 			const { stdout } = await execAsync('git remote get-url origin', { cwd: repoPath });
 			return stdout.trim();
 		} catch (error) {
@@ -100,21 +98,44 @@ export class ViewRemoteHandler implements CapabilityProvider {
 		}
 	}
 
-	private convertToWebUrl(gitUrl: string): string {
-		// Handle SSH URLs (git@github.com:user/repo.git)
-		if (gitUrl.startsWith('git@')) {
-			const sshMatch = gitUrl.match(/git@([^:]+):(.+)\.git$/);
-			if (sshMatch) {
-				return `https://${sshMatch[1]}/${sshMatch[2]}`;
+	private async resolveToWebUrl(gitUrl: string): Promise<string | null> {
+		const parsed = parseRemoteUrl(gitUrl);
+
+		switch (parsed.kind) {
+			case "http":
+				return parsed.webUrl;
+			case "ssh-userhost":
+			case "ssh-url": {
+				const path = parsed.path.replace(/\.git$/, "");
+				return `https://${resolveWebHostname(parsed.host)}/${path}`;
 			}
+			case "ssh-alias": {
+				const hostname = await this.resolveAliasHostname(parsed.alias);
+				if (!hostname) {
+					console.error("Could not resolve SSH config alias:", parsed.alias);
+					return null;
+				}
+				const path = parsed.path.replace(/\.git$/, "");
+				return `https://${resolveWebHostname(hostname)}/${path}`;
+			}
+			case "unknown":
+				console.error("Could not parse remote URL:", parsed.raw);
+				return null;
 		}
-		
-		// Handle HTTPS URLs (https://github.com/user/repo.git)
-		if (gitUrl.startsWith('https://')) {
-			return gitUrl.replace(/\.git$/, '');
+	}
+
+	private async resolveAliasHostname(alias: string): Promise<string | null> {
+		try {
+			const { execFile } = require('child_process');
+			const { promisify } = require('util');
+			const execFileAsync = promisify(execFile);
+
+			const { stdout } = await execFileAsync('ssh', ['-G', alias], { timeout: 5000 });
+			const match = (stdout as string).match(/^hostname\s+(.+)$/im);
+			return match ? match[1].trim() : null;
+		} catch (error) {
+			console.error("Failed to resolve SSH alias hostname:", alias, error);
+			return null;
 		}
-		
-		// Return as-is if we can't parse it
-		return gitUrl;
 	}
 }
