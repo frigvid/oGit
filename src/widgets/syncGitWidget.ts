@@ -1,6 +1,7 @@
 import { GitRepository } from "../git/gitRepository";
 import { GitWidget } from "./gitWidget";
 import { AutoSyncManager } from "./utils/autoSyncManager";
+import { logGitError } from "../git/utils/gitErrors";
 
 export class SyncGitWidget extends GitWidget {
 	private autoSyncManager: AutoSyncManager | null = null;
@@ -39,6 +40,7 @@ export class SyncGitWidget extends GitWidget {
 			this.updateText(statusStr);
 			this.enableEvents();
 		} catch (error) {
+			logGitError(error, "Sync widget failed for repo", this.gitRepository.repoAbsPath);
 			this.disableEvents();
 		}
 	}
