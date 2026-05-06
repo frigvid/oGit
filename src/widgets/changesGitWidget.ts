@@ -1,6 +1,7 @@
 import { App, Modal, Setting } from "obsidian";
 import { GitRepository } from "../git/gitRepository";
 import { GitWidget } from "./gitWidget";
+import { logGitError } from "../git/utils/gitErrors";
 import { NavColorUpdater } from "./navColorUpdater";
 export type GitNode = { path: string };
 
@@ -35,24 +36,28 @@ export class ChangesGitWidget extends GitWidget {
 	public getName() {return "changes-git-widget"};
 
 	async updateChanges() {
-		const changedNodes =
-			(await this.gitRepository.getChangedFiles()) as GitNode[];
-		const newPaths = new Set(changedNodes.map(n => n.path));
-		
-		if (this.setsEqual(newPaths, this.lastChangedPaths)) return;
-		this.lastChangedPaths = newPaths;
+		try {
+			const changedNodes =
+				(await this.gitRepository.getChangedFiles()) as GitNode[];
+			const newPaths = new Set(changedNodes.map(n => n.path));
 
-		this.navColorUpdater?.update(changedNodes);
+			if (this.setsEqual(newPaths, this.lastChangedPaths)) return;
+			this.lastChangedPaths = newPaths;
 
-		if (changedNodes.length > 0) {
-			this.changesBuffer = changedNodes.length;
-			this.widgetEl.classList.add("git-widget-changes");
-			this.updateText(this.changesBuffer.toString());
-			this.enableEvents();
-		} else {
-			this.widgetEl.classList.remove("git-widget-changes");
-			this.updateText("git");
-			this.disableEvents();
+			this.navColorUpdater?.update(changedNodes);
+
+			if (changedNodes.length > 0) {
+				this.changesBuffer = changedNodes.length;
+				this.widgetEl.classList.add("git-widget-changes");
+				this.updateText(this.changesBuffer.toString());
+				this.enableEvents();
+			} else {
+				this.widgetEl.classList.remove("git-widget-changes");
+				this.updateText("git");
+				this.disableEvents();
+			}
+		} catch (err) {
+			logGitError(err, "Changes widget failed for repo", this.gitRepository.repoAbsPath);
 		}
 	}
 

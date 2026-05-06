@@ -6,6 +6,7 @@ import { join } from "path";
 import { existsSync } from "fs";
 import { SmartDebouncer } from "./utils/smartDebouncer";
 import { GitEventBus } from "./utils/eventBus";
+import { logGitError } from "../git/utils/gitErrors";
 
 export class WidgetManager {
 	private static readonly VAULT_ACTIONS_SELECTOR = '.workspace-sidedock-vault-profile .workspace-drawer-vault-actions';
@@ -84,6 +85,7 @@ export class WidgetManager {
 				});
 			}
 		} catch (err) {
+			logGitError(err, "Failed to register widgets for", absPath);
 			return;
 		}
 	}

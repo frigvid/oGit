@@ -1,5 +1,6 @@
 import { App } from "obsidian";
 import { GitRepository } from "../git/gitRepository";
+import { logGitError } from "../git/utils/gitErrors";
 import { ChangesGitWidget } from "./changesGitWidget";
 import { SyncGitWidget } from "./syncGitWidget";
 import { Widget } from "./widget";
@@ -30,6 +31,7 @@ export class GitWidgetFactory {
 
 			return widgets;
 		} catch (err) {
+			logGitError(err, "Failed to build widgets for repo", repoAbsPath);
 			return [];
 		}
 	}
