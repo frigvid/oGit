@@ -36,11 +36,15 @@ export class SyncGitWidget extends GitWidget {
 				await this.gitRepository.getToPushCommitsCount();
 			const statusStr = "↑" + toPushCount + " ↓" + toPullCount;
 
+			this.widgetEl.classList.remove("git-widget-hidden");
 			this.widgetEl.classList.add("git-widget-sync");
 			this.updateText(statusStr);
 			this.enableEvents();
 		} catch (error) {
 			logGitError(error, "Sync widget failed for repo", this.gitRepository.repoAbsPath);
+			this.widgetEl.classList.add("git-widget-hidden");
+			this.widgetEl.classList.remove("git-widget-sync");
+			this.updateText("");
 			this.disableEvents();
 		}
 	}

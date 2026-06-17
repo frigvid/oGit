@@ -17,7 +17,7 @@ export class GitWidgetFactory {
 		repoAbsPath: string
 	): Promise<Widget[]> {
 		try {
-			const gitRepository = await GitRepository.getInstance(repoAbsPath);
+			const gitRepository = await GitRepository.getInstance(repoAbsPath, this.settings);
 
 			const widgets = [];
 
