@@ -50,6 +50,9 @@ const context = await esbuild.context({
     "@lezer/lr",
     ...builtins,
     ...builtins.map(m => `node:${m}`)],
+  define: {
+    "import.meta.vitest": "undefined",
+  },
   format: "cjs",
   target: "es2018",
   logLevel: "info",
