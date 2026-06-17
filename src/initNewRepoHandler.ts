@@ -2,13 +2,14 @@ import { TFile, TFolder } from "obsidian";
 import { GitRepository } from "./git/gitRepository";
 import { join } from "path";
 import { CapabilityProvider } from "./capabilityProvider";
+import { SshSettings } from "./git/utils/sshOptions";
 
 export class InitNewRepoHandler implements CapabilityProvider {
 	private static INIT_NEW_REPO = "Init git repository";
 	private static COMMAND_ID = "init-git-repo-active-folder";
 	private afterInitCallback: (initializedRepo: GitRepository) => void;
 
-	constructor(private basePath: string) {}
+	constructor(private basePath: string, private sshSettings?: SshSettings) {}
 
 	withCallback = (callback: (initializedRepo: GitRepository) => void) => {
 		this.afterInitCallback = callback;
@@ -56,7 +57,7 @@ export class InitNewRepoHandler implements CapabilityProvider {
 	}
 	
 	private initGitRepository = (folderPath: string) =>
-		GitRepository.initGitRepo(this.buildAbsPathTo(folderPath));
+		GitRepository.initGitRepo(this.buildAbsPathTo(folderPath), this.sshSettings);
 
 	private buildAbsPathTo = (path: string) => join(this.basePath, path);
 }

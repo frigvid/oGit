@@ -67,3 +67,44 @@ Several options are available in the plugin settings:
 ## Support
 
 - Made by [Mateus Molina](https://blog.mmolina.me)
+
+## Troubleshooting
+### SSH
+#### Widgets stop updating
+
+The plugin runs `git fetch` for sync widgets. If your ssh-agent doesn't have a matching identity loaded, SSH would normally block on a passphrase prompt. The plugin forces `BatchMode=yes` so these calls fail fast instead of hanging. To unblock them, right-click the repo folder in the file explorer and pick **Add identity to ssh-agent**.
+
+#### "Add identity to ssh-agent" doesn't appear in the right-click menu
+
+The item only appears when you right-click the repo's own folder (the one the sync/changes widgets attach to) and its `origin` remote is SSH-shaped (`git@host:user/repo.git`, `ssh://...`, or an SSH config alias). HTTPS remotes, non-repo folders, and files inside the repo hide the item.
+
+#### Obsidian's Keychain
+
+The keychain is used either to persist secrets, such as SSH passphrases, or as an intermediary when prompted to input the passphrase. The Advanced Option **Use Obsidian's Keychain** is what controls this behaviour. Turn it on if you want the plugin to remember your passphrases until Obsidian gets closed or the plugin gets disabled.
+
+If you happen to change the key out-of-band, a stale passphrase will be flushed on first failure and will require you to add it to the agent again.
+
+#### "Add identity" runs but ssh-add fails with a passphrase error
+
+If **Use Obsidian's secret storage** is enabled in Advanced Options and a previously cached passphrase has gone stale (e.g. you changed the key's passphrase out-of-band), the plugin clears the cache on first failure and re-prompts. If it keeps failing, confirm the passphrase is correct with `ssh-add ~/.ssh/<keyfile>` from a terminal.
+
+#### "Add identity" doesn't prompt and nothing seems to happen
+
+Check the developer console (Ctrl+Shift+I → Console). The plugin logs all ssh-add outcomes there. A common cause is that the ssh-agent is not running; see below.
+
+#### ssh-agent is not running
+
+Start it before retrying:
+
+- **Windows** (PowerShell as admin, once): `Start-Service ssh-agent` and to keep it running across reboots: `Set-Service ssh-agent -StartupType Automatic`.
+    - You can of course use another executable, but just ensure that your environment is set up correctly and that you don't have multiple different agents running.
+- **macOS/Linux**: `eval "$(ssh-agent -s)"` in your shell, or configure your desktop session to start it automatically.
+
+#### The plugin spawns the wrong `ssh`
+
+Open **Settings → Advanced Options**.
+
+With "Override SSH defaults" off, the plugin auto-detects the binary from `git config --global core.sshCommand`, then `where ssh`. Toggle the override on and set **SSH executable** to the absolute path you want, e.g. `C:\Program Files\Git\usr\bin\ssh.exe` or `C:\Windows\System32\OpenSSH\ssh.exe`.
+
+The plugin derives `ssh-add` from the same directory.
+

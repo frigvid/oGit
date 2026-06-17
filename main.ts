@@ -1,4 +1,30 @@
 import { Plugin, FileExplorer, FileSystemAdapter } from "obsidian";
+import { homedir } from "os";
+import { join } from "path";
+import { execFile } from "child_process";
+import { promisify } from "util";
+
+const execFileAsync = promisify(execFile);
+
+async function resolveSshExec(): Promise<string> {
+	try {
+		const { stdout } = await execFileAsync("git", ["config", "--global", "core.sshCommand"], { timeout: 3000 });
+		const val = stdout.trim();
+		if (val) {
+			const first = val.split(/\s+/)[0].replace(/^["']|["']$/g, "");
+			if (first) return first;
+		}
+	} catch { }
+
+	const whichCmd = process.platform === "win32" ? "where" : "which";
+	try {
+		const { stdout } = await execFileAsync(whichCmd, ["ssh"], { timeout: 3000 });
+		const first = stdout.trim().split(/\r?\n/)[0].trim();
+		if (first) return first;
+	} catch { }
+
+	return "ssh";
+}
 import { FileExplorerHandler } from "./src/fileExplorerHandler";
 import { WidgetManager } from "src/widgets/widgetManager";
 import { GitWidgetFactory } from "src/widgets/gitWidgetFactory";
@@ -10,6 +36,7 @@ import {
 import { InitNewRepoHandler } from "src/initNewRepoHandler";
 import { GitDiffHandler } from "src/gitDiffHandler";
 import { ViewRemoteHandler } from "src/viewRemoteHandler";
+import { SshAddHandler } from "src/sshAddHandler";
 import { ContextMenuInstaller } from "src/contextMenuInstaller";
 import { CommandRegister } from "src/commandRegister";
 import { CapabilityProvider } from "src/capabilityProvider";
@@ -45,9 +72,9 @@ export default class GitFileExplorerPlugin extends Plugin {
 		const capabilityProviders: CapabilityProvider[] = [
 			new GitDiffHandler(this.getVaultBasePath())
 				.withCallback(() => this.widgetManager?.update()),
-			new InitNewRepoHandler(this.getVaultBasePath())
+			new InitNewRepoHandler(this.getVaultBasePath(), this.settings)
 				.withCallback(() => this.widgetManager?.update()),
-			new ViewRemoteHandler(this.getVaultBasePath())
+			new ViewRemoteHandler(this.getVaultBasePath(), this.settings)
 		];
 
 		const contextMenuInstaller = new ContextMenuInstaller(this);
@@ -58,12 +85,22 @@ export default class GitFileExplorerPlugin extends Plugin {
 			contextMenuInstaller.installContextMenu(provider);
 			commandRegister.registerCommandForActiveFile(provider);
 		});
+
+		contextMenuInstaller.installContextMenu(
+			new SshAddHandler(this.app, this.getVaultBasePath(), this.settings)
+				.withCallback(() => this.widgetManager?.update())
+		);
 	};
 
 	onunload() {
 		console.log("Unloading GitFileExplorerPlugin");
 		this.widgetManager.uninstallAll();
 		this.deregisterEventListeners(this.widgetManager.update);
+		try {
+			for (const id of this.app.secretStorage.listSecrets()) {
+				if (id.startsWith("ogit-")) this.app.secretStorage.deleteSecret(id);
+			}
+		} catch (err) { console.error("[ogit] secret cleanup failed:", err); }
 	}
 
 	async loadSettings() {
@@ -72,6 +109,15 @@ export default class GitFileExplorerPlugin extends Plugin {
 			DEFAULT_SETTINGS,
 			await this.loadData()
 		);
+		if (!this.settings.sshOverride) {
+			await this.detectAndApplySshDefaults();
+			await this.saveSettings();
+		}
+	}
+
+	async detectAndApplySshDefaults() {
+		this.settings.sshDir = join(homedir(), ".ssh");
+		this.settings.sshExec = await resolveSshExec();
 	}
 
 	async saveSettings() {

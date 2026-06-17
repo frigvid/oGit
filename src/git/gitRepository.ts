@@ -3,14 +3,19 @@ import { join } from "path";
 import { existsSync } from "fs";
 import { TerminalExecutor } from "./utils/terminalExecutor";
 import { GitEventBus } from "../widgets/utils/eventBus";
+import { SshSettings, buildGitSshCommand } from "./utils/sshOptions";
 
 export class GitRepository {
 	private git: SimpleGit;
 	private remoteBranch: string | undefined = undefined;
 	private eventBus: GitEventBus;
 
-	private constructor(public repoAbsPath: string) {
-		this.git = simpleGit(this.repoAbsPath);
+	private constructor(public repoAbsPath: string, sshSettings?: SshSettings) {
+		this.git = simpleGit(this.repoAbsPath, { unsafe: { allowUnsafeSshCommand: true } });
+		this.git.env({
+			...process.env,
+			GIT_SSH_COMMAND: buildGitSshCommand(sshSettings),
+		});
 		this.eventBus = GitEventBus.getInstance();
 	}
 
@@ -23,21 +28,21 @@ export class GitRepository {
 			this.remoteBranch = await this.getRemoteBranch();
 	}
 
-	static async getInstance(repoAbsPath: string): Promise<GitRepository> {
+	static async getInstance(repoAbsPath: string, sshSettings?: SshSettings): Promise<GitRepository> {
 		if (!GitRepository.isGitRepo(repoAbsPath)) {
 			throw new Error("Not a git repository @ " + repoAbsPath);
 		}
 
-		const gitRepository = new GitRepository(repoAbsPath);
+		const gitRepository = new GitRepository(repoAbsPath, sshSettings);
 		await gitRepository.setup();
 
 		return gitRepository;
 	}
 
-	static initGitRepo(repoAbsPath: string): GitRepository {
+	static initGitRepo(repoAbsPath: string, sshSettings?: SshSettings): GitRepository {
 		const git = simpleGit(repoAbsPath);
 		git.init();
-		return new GitRepository(repoAbsPath);
+		return new GitRepository(repoAbsPath, sshSettings);
 	}
 
 	static isGitRepo(fullPath: string): boolean {
