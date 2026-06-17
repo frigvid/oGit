@@ -7,6 +7,7 @@ export class ContextMenuInstaller {
     public installContextMenu(provider: CapabilityProvider): void {
         this.plugin.registerEvent(
             this.plugin.app.workspace.on("file-menu", (menu: Menu, fileOrFolder: TFile | TFolder) => {
+                if (provider.shouldShowFor?.(fileOrFolder) === false) return;
                 menu.addItem((item: MenuItem) => {
                     item.setTitle(provider.getCommandName())
                         .setIcon(provider.getIcon())

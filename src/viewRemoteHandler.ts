@@ -1,6 +1,8 @@
 import { TFile, TFolder } from "obsidian";
 import { GitRepository } from "./git/gitRepository";
 import { parseRemoteUrl, resolveWebHostname } from "./git/utils/remoteUrl";
+import { SshSettings, buildSshArgs, buildSshExec } from "./git/utils/sshOptions";
+import { findGitRepoRoot } from "./git/utils/repoRoot";
 import { join } from "path";
 import { CapabilityProvider } from "./capabilityProvider";
 
@@ -8,7 +10,7 @@ export class ViewRemoteHandler implements CapabilityProvider {
 	private static VIEW_REMOTE = "View remote";
 	private static COMMAND_ID = "view-remote-repo";
 
-	constructor(private basePath: string) {}
+	constructor(private basePath: string, private sshSettings?: SshSettings) {}
 
 	public async execute(fileOrFolder: TFile | TFolder): Promise<void> {
 		// First check if this is applicable (within a git repository)
@@ -16,9 +18,9 @@ export class ViewRemoteHandler implements CapabilityProvider {
 		if (!folderPath) return;
 
 		const absPath = this.buildAbsPathTo(folderPath);
-		
+
 		// Check if this file/folder is within a git repository
-		const repoRoot = this.findGitRepoRoot(absPath);
+		const repoRoot = findGitRepoRoot(absPath);
 		if (!repoRoot) return;
 		
 		try {
@@ -60,29 +62,6 @@ export class ViewRemoteHandler implements CapabilityProvider {
 	}
 
 	private buildAbsPathTo = (path: string) => join(this.basePath, path);
-	
-	// Find the git repository root by walking up the directory tree
-	private findGitRepoRoot(startPath: string): string | null {
-		let currentPath = startPath;
-		
-		while (currentPath && currentPath.length > 0) {
-			if (GitRepository.isGitRepo(currentPath)) {
-				return currentPath;
-			}
-			
-			// Go up one directory
-			const parentPath = join(currentPath, "..");
-			
-			// If we're at the root, stop searching
-			if (parentPath === currentPath) {
-				return null;
-			}
-			
-			currentPath = parentPath;
-		}
-		
-		return null;
-	}
 
 	private async getRemoteUrl(repoPath: string): Promise<string | null> {
 		try {
@@ -125,16 +104,18 @@ export class ViewRemoteHandler implements CapabilityProvider {
 	}
 
 	private async resolveAliasHostname(alias: string): Promise<string | null> {
+		const sshArgs = buildSshArgs(this.sshSettings);
+		const fullArgs = [...sshArgs, '-G', alias];
 		try {
 			const { execFile } = require('child_process');
 			const { promisify } = require('util');
 			const execFileAsync = promisify(execFile);
 
-			const { stdout } = await execFileAsync('ssh', ['-G', alias], { timeout: 5000 });
+			const { stdout } = await execFileAsync(buildSshExec(this.sshSettings), fullArgs, { timeout: 5000 });
 			const match = (stdout as string).match(/^hostname\s+(.+)$/im);
 			return match ? match[1].trim() : null;
 		} catch (error) {
-			console.error("Failed to resolve SSH alias hostname:", alias, error);
+			console.error("Failed to resolve SSH alias hostname:", alias, "(command: ssh", fullArgs.join(' ') + ")", error);
 			return null;
 		}
 	}

@@ -36,4 +36,8 @@ declare module "obsidian" {
 		collapsed: boolean;
 		pusherEl: HTMLDivElement;
 	}
+
+	export interface SecretStorage {
+		deleteSecret(id: string): void;
+	}
 }

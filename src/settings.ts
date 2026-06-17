@@ -9,6 +9,10 @@ export interface GitFileExplorerPluginSettings {
 	navColorStyle: "colored-text" | "margin-highlight";
 	autoSyncOnStartup: boolean;
 	autoSyncFrequency: number;
+	sshOverride: boolean;
+	sshDir: string;
+	sshExec: string;
+	useSecretStorage: boolean;
 }
 
 export const DEFAULT_SETTINGS: Partial<GitFileExplorerPluginSettings> = {
@@ -19,6 +23,8 @@ export const DEFAULT_SETTINGS: Partial<GitFileExplorerPluginSettings> = {
 	navColorStyle: "colored-text",
 	autoSyncOnStartup: false,
 	autoSyncFrequency: 0,
+	sshOverride: false,
+	useSecretStorage: false,
 };
 
 export class GitFileExplorerSettingTab extends PluginSettingTab {
@@ -82,6 +88,11 @@ export class GitFileExplorerSettingTab extends PluginSettingTab {
 			.createEl("i")
 			.setText("Changes require restarting Obsidian");
 
+		const advancedDetails = containerEl.createEl("details");
+		advancedDetails.createEl("summary", { text: "Advanced Options" });
+		const advancedContainer = advancedDetails.createDiv();
+		this.renderAdvancedOptions(advancedContainer);
+
 		this.containerEl.createEl("h2", {
 			text: "About",
 		});
@@ -132,12 +143,69 @@ export class GitFileExplorerSettingTab extends PluginSettingTab {
 						.addOption("colored-text", "Colored text")
 						.addOption("margin-highlight", "Margin highlight + colored text")
 						.setValue(this.plugin.settings.navColorStyle)
-						.onChange(async (value: "colored-text" | "margin-highlight") => {
-							this.plugin.settings.navColorStyle = value;
+						.onChange(async (value: string) => {
+							this.plugin.settings.navColorStyle = value as "colored-text" | "margin-highlight";
 							await this.plugin.saveSettings();
 						})
 				);
 		}
+	}
+
+	private renderAdvancedOptions(container: HTMLElement): void {
+		container.empty();
+
+		new Setting(container)
+			.setName("Override SSH defaults")
+			.setDesc("Use a custom SSH directory and executable for git and SSH operations performed by the plugin.")
+			.addToggle(toggle =>
+				toggle
+					.setValue(this.plugin.settings.sshOverride)
+					.onChange(async (value) => {
+						this.plugin.settings.sshOverride = value;
+						if (!value)
+							await this.plugin.detectAndApplySshDefaults();
+						await this.plugin.saveSettings();
+						this.renderAdvancedOptions(container);
+					})
+			);
+
+		new Setting(container)
+			.setName("SSH directory")
+			.setDesc("Path to a directory containing an SSH config file and identity files. Only affects operations performed by the plugin.")
+			.addText(text =>
+				text
+					.setValue(this.plugin.settings.sshDir ?? "")
+					.setDisabled(!this.plugin.settings.sshOverride)
+					.onChange(async (value) => {
+						this.plugin.settings.sshDir = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(container)
+			.setName("SSH executable")
+			.setDesc("Path to the ssh executable used by plugin git/ssh operations. When override is off, the plugin uses your global git core.sshCommand if set, otherwise the first ssh on PATH.")
+			.addText(text =>
+				text
+					.setValue(this.plugin.settings.sshExec ?? "")
+					.setDisabled(!this.plugin.settings.sshOverride)
+					.onChange(async (value) => {
+						this.plugin.settings.sshExec = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(container)
+			.setName("Use Obsidian's Keychain")
+			.setDesc("Let the plugin store and persist sensitive values (e.g. SSH key passphrases) in Obsidian's secure secret storage. If this setting is off, it'll only be used as an intermediary when adding an identity to the SSH agent, for example. Persistence only lasts until Obsidian is closed or if the plugin gets disabled.")
+			.addToggle(toggle =>
+				toggle
+					.setValue(this.plugin.settings.useSecretStorage)
+					.onChange(async (value) => {
+						this.plugin.settings.useSecretStorage = value;
+						await this.plugin.saveSettings();
+					})
+			);
 	}
 
 	private renderAutoSyncSettings(container: HTMLElement, isVisible: boolean): void {
