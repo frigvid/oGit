@@ -73,7 +73,10 @@ export default class GitFileExplorerPlugin extends Plugin {
 			new GitDiffHandler(this.getVaultBasePath())
 				.withCallback(() => this.widgetManager?.update()),
 			new InitNewRepoHandler(this.getVaultBasePath(), this.settings)
-				.withCallback(() => this.widgetManager?.update()),
+				.withCallback(() => {
+					this.widgetManager?.initialize();
+					this.widgetManager?.update();
+				}),
 			new ViewRemoteHandler(this.getVaultBasePath(), this.settings)
 		];
 

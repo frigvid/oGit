@@ -55,6 +55,11 @@ export class WidgetManager {
 		this.rootContainerEl = this.createRootWidgetContainer() ?? null;
 		if (!this.rootContainerEl) return;
 
+		const alreadyWidgetized = this.widgets.some((widget) =>
+			widget.getParent().isEqualNode(this.rootContainerEl)
+		);
+		if (alreadyWidgetized) return;
+
 		await this.registerWidgets(this.rootContainerEl, this.basePath);
 	};
 
@@ -91,6 +96,9 @@ export class WidgetManager {
 	}
 
 	private createRootWidgetContainer(): HTMLElement | undefined {
+		const existing = document.querySelector<HTMLElement>('#git-root-widget-container');
+		if (existing) return existing;
+
 		const drawerEl = this.app.workspace.leftSplit?.containerEl;
 		if (!drawerEl) return undefined;
 
